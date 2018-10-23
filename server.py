@@ -3,8 +3,8 @@
 """
 Clase (y programa principal) para un servidor de eco en UDP simple
 """
-import sys
-import socketserver
+import sys, json, socketserver
+from datetime import datetime, date, time, timedelta
 
 if len(sys.argv) != 2:
     sys.exit('Usage: python3 server.py port')
@@ -33,11 +33,28 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                 self.wfile.write(b"SIP/2.0 200 OK\r\n\r\n")
                 print(user + ' eliminado')
             except KeyError:
-                pass
+                self.expires()
         else:
-            self.diccionario[user] = [self.client_address[0], expires]
+            address = self.client_address[0] + ':' + str(self.client_address[1])
+            expires_time = (datetime.now() + timedelta(seconds=int(expires))).strftime('%H:%M:%S %d-%m-%Y')
+            self.diccionario[user] = {'address' : address, 'expires' : expires_time}
             self.wfile.write(b"SIP/2.0 200 OK\r\n\r\n")
             print(str.upper(metodo) + ' recibido de ' + user)
+        self.registered2json()
+
+    def expires(self):
+        now = datetime.now().strftime('%H:%M:%S %d-%m-%Y')
+        del_list = []
+        for usuario in self.diccionario:
+            if now >= self.diccionario[usuario]['expires']:
+                del_list.append(usuario)
+        for user in del_list:
+            del self.diccionario[user]
+    
+    def registered2json(self):
+        self.expires()
+        with open('registered.json', 'w') as jsonfile:
+            json.dump(self.diccionario, jsonfile, indent=3)
 
 if __name__ == "__main__":
     # Listens at localhost ('') port 6001 
